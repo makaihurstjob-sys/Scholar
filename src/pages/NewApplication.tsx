@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles, Copy, RefreshCw, Check, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,32 +6,56 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { mockEssays } from "@/lib/mockData";
+import { generateEssay } from "@/lib/api";
+
+const RESUME_STORAGE_KEY = "scholar_resume_text";
+const DEFAULT_RESUME_TEXT =
+  "Upload your resume on the Resume page to auto-fill this field, or paste your resume text here.";
 
 const NewApplication = () => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [resumeText, setResumeText] = useState(
-    "Alex Rivera — B.S. Computer Science (in progress), GPA 3.92.\nExperience: SWE intern at Northwind Labs, Robotics Club lead, Open-source contributor (3 merged PRs to React Hook Form).\nSkills: TypeScript, Python, system design, accessibility.",
-  );
+  const [resumeText, setResumeText] = useState(DEFAULT_RESUME_TEXT);
   const [essay, setEssay] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [variant, setVariant] = useState(0);
 
-  const generate = () => {
+  useEffect(() => {
+    const storedResumeText = localStorage.getItem(RESUME_STORAGE_KEY);
+    if (storedResumeText?.trim()) {
+      setResumeText(storedResumeText);
+    }
+  }, []);
+
+  const generate = async () => {
     if (!name.trim() && !description.trim()) {
       toast({ title: "Add a scholarship", description: "Paste a name or description first." });
       return;
     }
+
+    if (!resumeText.trim()) {
+      toast({ title: "Add your resume", description: "Upload or paste resume text first." });
+      return;
+    }
+
     setLoading(true);
     setEssay("");
-    const next = (variant + 1) % mockEssays.length;
-    setTimeout(() => {
-      setEssay(mockEssays[next]);
-      setVariant(next);
+
+    try {
+      const response = await generateEssay({
+        scholarship_name: name.trim() || "Untitled Scholarship",
+        scholarship_description: description.trim(),
+        resume_text: resumeText.trim(),
+      });
+
+      setEssay(response.essay);
+      toast({ title: "Essay generated", description: "Your draft is ready to review." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Generation failed.";
+      toast({ title: "Unable to generate essay", description: message, variant: "destructive" });
+    } finally {
       setLoading(false);
-    }, 1400);
+    }
   };
 
   const copy = async () => {
