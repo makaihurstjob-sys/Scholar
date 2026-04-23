@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { FileText, Eye, RefreshCw } from "lucide-react";
+import { FileText, Eye, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ResumeDropzone } from "@/components/ResumeDropzone";
+import { toast } from "@/hooks/use-toast";
+import { uploadResume } from "@/lib/api";
 
 interface StoredResume {
   file: File;
@@ -10,8 +12,11 @@ interface StoredResume {
   uploadedAt: Date;
 }
 
+const RESUME_STORAGE_KEY = "scholar_resume_text";
+
 const Resume = () => {
   const [resume, setResume] = useState<StoredResume | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -19,9 +24,21 @@ const Resume = () => {
     };
   }, [resume]);
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     if (resume) URL.revokeObjectURL(resume.url);
     setResume({ file, url: URL.createObjectURL(file), uploadedAt: new Date() });
+
+    setUploading(true);
+    try {
+      const response = await uploadResume(file);
+      localStorage.setItem(RESUME_STORAGE_KEY, response.parsed_text);
+      toast({ title: "Resume uploaded", description: "Resume parsed and ready for essay generation." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Upload failed.";
+      toast({ title: "Upload failed", description: message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const formatSize = (bytes: number) => {
@@ -65,8 +82,8 @@ const Resume = () => {
                   View
                 </a>
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setResume(null)}>
-                <RefreshCw className="h-4 w-4" />
+              <Button variant="outline" size="sm" onClick={() => setResume(null)} disabled={uploading}>
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                 Replace
               </Button>
             </div>
